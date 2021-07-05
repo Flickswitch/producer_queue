@@ -22,12 +22,13 @@ defmodule ProducerQueue.Producer do
 
   defp check({:producer, state}), do: {:producer, check(state)}
   defp check({:noreply, push, state}), do: {:noreply, push, check(state)}
+  defp check({_, _, _, nil} = state), do: send(self(), :c) && state
   defp check(state), do: Process.send_after(self(), :c, elem(state, 3)) && state
 
-  defp demand({:state, _, queue, c} = state, total) do
+  defp demand({:state, _, queue, _} = state, total) do
     state
     |> demand(total, queue, 100, 3_000)
-    |> then(&{:noreply, &1, {:state, total - length(&1), queue, c}})
+    |> then(&{:noreply, &1, {:state, total - length(&1), queue, 0}})
     |> check()
   end
 

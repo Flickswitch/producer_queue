@@ -73,4 +73,9 @@ defmodule ProducerQueue.ProducerTest do
 
     assert {:noreply, 'test', _} = Producer.handle_demand(10, state)
   end
+
+  test "no sleep" do
+    assert {:ok, q} = GenServer.start_link(Queue, [])
+    assert {:ok, _} = Producer.start_link(queue: q, check: nil)
+  end
 end
