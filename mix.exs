@@ -4,7 +4,7 @@ defmodule ProducerQueue.MixProject do
   def project do
     [
       app: :producer_queue,
-      version: "5.0.1",
+      version: "5.0.2",
       elixir: "~> 1.12",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -22,9 +22,9 @@ defmodule ProducerQueue.MixProject do
 
   defp deps do
     [
-      {:broadway, "~> 0.6.2", only: :dev},
-      {:credo, "~> 1.5.4", only: [:dev, :test], runtime: false},
-      {:excoveralls, "~> 0.14.0", only: :test},
+      {:broadway, "~> 1.0", only: :dev},
+      {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
+      {:excoveralls, "~> 0.14.4", only: :test},
       {:gen_stage, "~> 1.1"}
     ]
   end
