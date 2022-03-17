@@ -6,19 +6,19 @@ defmodule ProducerQueue.Producer do
   use GenStage
 
   @typedoc """
-  State for the producer: {demand, queue_module, check_interval}
+  {demand_count, queue_module, check_interval_in_ms}
   """
   @type producer_state :: {pos_integer(), atom(), pos_integer()}
 
   @doc """
   Start a `ProducerQueue.Producer` linked to a `ProducerQueue.Queue`
   """
-  @impl true
   def start_link(opts \\ []), do: GenStage.start_link(__MODULE__, opts)
 
   @impl true
+  @spec init(opts :: []) :: {:producer, producer_state()}
   def init(opts) do
-    {:producer, {0, Keyword.get(opts, :queue), Keyword.get(opts, :check_interval, 100)}}
+    {:producer, {0, Keyword.get(opts, :queue), Keyword.get(opts, :check_interval, 500)}}
   end
 
   @impl true
@@ -37,10 +37,14 @@ defmodule ProducerQueue.Producer do
     {:noreply, events, {demand, queue, check_interval}}
   end
 
+  # demand satisfied - no requeue needed
+  defp requeue_dispatch(_, 0, _), do: :noop
+
+  # run out of events to send to consumer - try to satisfy demand later
   defp requeue_dispatch([], _, check_interval) do
     Process.send_after(self(), :dispatch_events, check_interval)
   end
 
-  defp requeue_dispatch(_, 0, _), do: :noop
-  defp requeue_dispatch(_, _, _), do: Process.send_after(self(), :dispatch_events, 0)
+  # demand not satisfied and events available - try to satisfy demand immediately
+  defp requeue_dispatch(_, _, _), do: send(self(), :dispatch_events)
 end
