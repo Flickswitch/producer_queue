@@ -3,79 +3,56 @@ defmodule ProducerQueue.ProducerTest do
 
   alias ProducerQueue.Producer
   alias ProducerQueue.Queue
+  alias ProducerQueue.TestConsumer
 
   setup do
     {:ok, queue} = Queue.start_link()
-    [state: {:state, 0, queue, 10}, queue: queue]
-  end
-
-  test "init sets up check", %{state: state} do
-    {_, _} = Producer.init(state)
-    assert_receive(:c)
+    [state: {0, queue, 10}, queue: queue]
   end
 
   test "handle zero demand with zero backlog", %{state: state} do
-    {:noreply, [], _} = Producer.handle_demand(0, state)
+    assert {:noreply, [], ^state} = Producer.handle_demand(0, state)
+    refute_receive :dispatch_events
   end
 
-  test "handle demand", %{state: state} do
-    assert {:ok, queue} = Queue.start_link()
-    assert :ok = Queue.push_async(queue, '123')
-    state = {:state, elem(state, 1), queue, elem(state, 3)}
-    {:noreply, '123', _} = Producer.handle_demand(3, state)
+  test "handle demand with zero backlog", %{state: {_, queue, check_interval} = state} do
+    :ok = Queue.push(queue, '123')
+    expected_state = {0, queue, check_interval}
+
+    assert {:noreply, '123', ^expected_state} = Producer.handle_demand(3, state)
+    assert Queue.pop(queue) == []
+    refute_receive :dispatch_events
   end
 
-  test "handle info with no backlog", %{state: state} do
-    assert {:noreply, [], _} = Producer.handle_info(:c, state)
+  test "handle demand with backlog", %{state: {_, queue, check_interval}} do
+    :ok = Queue.push(queue, '12')
+    {:ok, producer} = Producer.start_link(check_interval: 10, queue: queue)
+    {:ok, consumer} = TestConsumer.start_link(producer)
+
+    Process.sleep(check_interval)
+    assert TestConsumer.get_events_count(consumer) == 2
+
+    :ok = Queue.push(queue, '3')
+    Process.sleep(check_interval * 2)
+
+    assert TestConsumer.get_events_count(consumer) == 3
+  end
+end
+
+defmodule ProducerQueue.TestConsumer do
+  use GenStage
+
+  def start_link(producer), do: GenStage.start_link(__MODULE__, producer)
+
+  def init(producer), do: {:consumer, 0, subscribe_to: [{producer, max_demand: 3}]}
+
+  def get_events_count(pid), do: GenStage.call(pid, :get_events_count)
+
+  def handle_call(:get_events_count, _from, events_count) do
+    {:reply, events_count, [], events_count}
   end
 
-  test "handle info with backlog", %{state: state} do
-    assert {:ok, queue} = Queue.start_link()
-    assert :ok = Queue.push_async(queue, '123')
-    state = {:state, 3, queue, elem(state, 3)}
-    assert {:noreply, '123', _} = Producer.handle_info(:c, state)
-  end
-
-  test "start_link" do
-    assert {:ok, q} = GenServer.start_link(Queue, [])
-    assert {:ok, p} = Producer.start_link(queue: q)
-    assert is_pid(p)
-  end
-
-  test "no proc blocks" do
-    state = {:state, 0, FakeProc, 10}
-
-    spawn_link(fn ->
-      Process.sleep(90)
-      Queue.start_link(name: FakeProc)
-      Queue.push(FakeProc, 'test')
-    end)
-
-    {:noreply, 'test', _} = Producer.handle_demand(10, state)
-  end
-
-  test "killed blocks" do
-    state = {:state, 0, KillProc, 10}
-
-    spawn(fn ->
-      assert {:ok, pid} = Queue.start_link(name: KillProc)
-      assert true = Process.exit(pid, :kill)
-    end)
-
-    spawn(fn ->
-      Process.sleep(50)
-
-      [name: KillProc]
-      |> Queue.start_link()
-      |> elem(1)
-      |> Queue.push('test')
-    end)
-
-    assert {:noreply, 'test', _} = Producer.handle_demand(10, state)
-  end
-
-  test "no sleep" do
-    assert {:ok, q} = GenServer.start_link(Queue, [])
-    assert {:ok, _} = Producer.start_link(queue: q, check: nil)
+  def handle_events(events, _from, events_count) do
+    {:noreply, [], events_count + length(events)}
   end
 end

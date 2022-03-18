@@ -5,40 +5,46 @@ defmodule ProducerQueue.Producer do
 
   use GenStage
 
+  @typedoc """
+  {demand_count, queue_module, check_interval_in_ms}
+  """
+  @type producer_state :: {pos_integer(), atom(), pos_integer()}
+
   @doc """
   Start a `ProducerQueue.Producer` linked to a `ProducerQueue.Queue`
   """
   def start_link(opts \\ []), do: GenStage.start_link(__MODULE__, opts)
 
-  def init(opts) when is_list(opts) do
-    init({:state, 0, Keyword.get(opts, :queue), Keyword.get(opts, :check, 10)})
+  @impl true
+  @spec init(opts :: []) :: {:producer, producer_state()}
+  def init(opts) do
+    {:producer, {0, Keyword.get(opts, :queue), Keyword.get(opts, :check_interval, 500)}}
   end
 
-  def init(state), do: {:producer, state} |> check()
-  def handle_demand(0, {_, 0, _, _} = state), do: check({:noreply, [], state})
-  def handle_demand(new, {_, old, _, _} = state), do: demand(state, new + old)
-  def handle_info(:c, {_, 0, _, _} = state), do: check({:noreply, [], state})
-  def handle_info(:c, {_, old, _, _} = state), do: demand(state, old)
+  @impl true
+  def handle_info(:dispatch_events, state), do: dispatch_events(state)
 
-  defp check({:producer, state}), do: {:producer, check(state)}
-  defp check({:noreply, push, state}), do: {:noreply, push, check(state)}
-  defp check({_, _, _, nil} = state), do: send(self(), :c) && state
-  defp check(state), do: Process.send_after(self(), :c, elem(state, 3)) && state
-
-  defp demand({:state, _, queue, _} = state, total) do
-    state
-    |> demand(total, queue, 100, 3_000)
-    |> then(&{:noreply, &1, {:state, total - length(&1), queue, 0}})
-    |> check()
+  @impl true
+  def handle_demand(new_demand, {demand, queue, check_interval}) do
+    dispatch_events({demand + new_demand, queue, check_interval})
   end
 
-  defp demand(_, _total, _queue, _, limit) when limit < 0, do: []
+  defp dispatch_events({demand, queue, check_interval}) do
+    events = ProducerQueue.Queue.pop(queue, demand)
+    demand = demand - length(events)
+    requeue_dispatch(events, demand, check_interval)
 
-  defp demand(state, total, queue, sleep, limit) do
-    apply(ProducerQueue.Queue, :pop, [queue, total])
-  catch
-    :exit, _ ->
-      Process.sleep(sleep)
-      demand(state, total, queue, sleep, limit - sleep)
+    {:noreply, events, {demand, queue, check_interval}}
   end
+
+  # demand satisfied - no requeue needed
+  defp requeue_dispatch(_, 0, _), do: :noop
+
+  # run out of events to send to consumer - try to satisfy demand later
+  defp requeue_dispatch([], _, check_interval) do
+    Process.send_after(self(), :dispatch_events, check_interval)
+  end
+
+  # demand not satisfied and events available - try to satisfy demand immediately
+  defp requeue_dispatch(_, _, _), do: send(self(), :dispatch_events)
 end
