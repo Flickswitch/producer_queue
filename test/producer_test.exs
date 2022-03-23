@@ -7,7 +7,7 @@ defmodule ProducerQueue.ProducerTest do
 
   setup do
     {:ok, queue} = Queue.start_link()
-    [state: {0, queue, 10}, queue: queue]
+    [state: {0, queue, 10, nil}, queue: queue]
   end
 
   test "handle zero demand with zero backlog", %{state: state} do
@@ -15,16 +15,27 @@ defmodule ProducerQueue.ProducerTest do
     refute_receive :dispatch_events
   end
 
-  test "handle demand with zero backlog", %{state: {_, queue, check_interval} = state} do
+  test "handle demand with zero backlog", %{state: {_, queue, check_interval, _} = state} do
     :ok = Queue.push(queue, '123')
-    expected_state = {0, queue, check_interval}
+    expected_state = {0, queue, check_interval, nil}
 
     assert {:noreply, '123', ^expected_state} = Producer.handle_demand(3, state)
     assert Queue.pop(queue) == []
     refute_receive :dispatch_events
   end
 
-  test "handle demand with backlog", %{state: {_, queue, check_interval}} do
+  test "handle demand with backlog - basic", %{state: {_, queue, check_interval, _} = state} do
+    :ok = Queue.push(queue, '12')
+
+    assert {:noreply, '12', {1, ^queue, ^check_interval, timer}} =
+             Producer.handle_demand(3, state)
+
+    assert is_reference(timer)
+    assert Queue.pop(queue) == []
+    assert_receive :dispatch_events
+  end
+
+  test "handle demand with backlog", %{state: {_, queue, check_interval, _}} do
     :ok = Queue.push(queue, '12')
     {:ok, producer} = Producer.start_link(check_interval: 10, queue: queue)
     {:ok, consumer} = TestConsumer.start_link(producer)

@@ -4,7 +4,7 @@ defmodule ProducerQueue.MixProject do
   def project do
     [
       app: :producer_queue,
-      version: "5.0.2",
+      version: "5.0.3",
       elixir: "~> 1.12",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
