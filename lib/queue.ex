@@ -40,6 +40,11 @@ defmodule ProducerQueue.Queue do
   end
 
   @doc ~s"""
+  Get queue size
+  """
+  def size_map(queue), do: GenServer.call(queue, :size_map, @wait)
+
+  @doc ~s"""
   Pop a number of items of the front of a queue (timeout: #{@wait})
 
   ## Example

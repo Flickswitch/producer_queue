@@ -40,6 +40,14 @@ defmodule ProducerQueue.PriorityKeyServer do
   def init(opts), do: init(:priority, Keyword.get(opts, :priority, [:default]))
   def init(:priority, prio), do: {:ok, {prio, Enum.into(prio, %{}, &{&1, @q})}}
 
+  def handle_call(:size_map, _, {prio, queues} = state) do
+    for key <- prio, into: %{} do
+      {key, queues |> Map.get(key) |> elem(0)}
+    end
+    |> Map.put(:_, prio)
+    |> then(&{:reply, &1, state})
+  end
+
   def handle_call({:pop, count}, _, state), do: out(count, state)
   def handle_call({:push, list}, _, state), do: {:reply, :ok, qin(list, state)}
   def handle_cast({:push, list}, state), do: {:noreply, qin(list, state)}
