@@ -44,7 +44,8 @@ defmodule ProducerQueue.QueueTest do
 
   describe "priority" do
     setup do
-      Queue.start_link(name: TestQueue, priority: [:high, :medium, :low]) && :ok
+      start_supervised!({Queue, name: TestQueue, priority: [:high, :medium, :low]})
+      :ok
     end
 
     test "basic push" do
