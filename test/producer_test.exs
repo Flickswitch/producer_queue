@@ -22,7 +22,7 @@ defmodule ProducerQueue.ProducerTest do
     :ok = Queue.push(queue, '123')
     expected_state = %Producer{queue: queue, check_interval: check_interval}
 
-    assert {:noreply, '123', ^expected_state} = Producer.handle_demand(3, state)
+    assert {:noreply, ~c"123", ^expected_state} = Producer.handle_demand(3, state)
     assert Queue.pop(queue) == []
     refute_receive :dispatch_events
   end
@@ -53,7 +53,7 @@ defmodule ProducerQueue.ProducerTest do
     Process.sleep(check_interval)
     assert TestConsumer.get_events_count(consumer) == 2
 
-    :ok = Queue.push(queue, '3')
+    :ok = Queue.push(queue, ~c"3")
     Process.sleep(check_interval * 2)
 
     assert TestConsumer.get_events_count(consumer) == 3
