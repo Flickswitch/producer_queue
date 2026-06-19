@@ -19,7 +19,7 @@ defmodule ProducerQueue.ProducerTest do
     state: %Producer{check_interval: check_interval} = state,
     queue: queue
   } do
-    :ok = Queue.push(queue, '123')
+    :ok = Queue.push(queue, ~c"123")
     expected_state = %Producer{queue: queue, check_interval: check_interval}
 
     assert {:noreply, ~c"123", ^expected_state} = Producer.handle_demand(3, state)
@@ -31,9 +31,9 @@ defmodule ProducerQueue.ProducerTest do
     state: %Producer{check_interval: check_interval} = state,
     queue: queue
   } do
-    :ok = Queue.push(queue, '12')
+    :ok = Queue.push(queue, ~c"12")
 
-    assert {:noreply, '12',
+    assert {:noreply, ~c"12",
             %Producer{demand: 1, queue: ^queue, check_interval: ^check_interval, timer: timer}} =
              Producer.handle_demand(3, state)
 
@@ -46,7 +46,7 @@ defmodule ProducerQueue.ProducerTest do
     state: %Producer{check_interval: check_interval},
     queue: queue
   } do
-    :ok = Queue.push(queue, '12')
+    :ok = Queue.push(queue, ~c"12")
     {:ok, producer} = Producer.start_link(check_interval: 10, queue: queue)
     {:ok, consumer} = TestConsumer.start_link(producer)
 
