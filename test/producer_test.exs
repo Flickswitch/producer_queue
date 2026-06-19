@@ -16,18 +16,18 @@ defmodule ProducerQueue.ProducerTest do
   end
 
   test "handle demand with zero backlog", %{state: {_, queue, check_interval, _} = state} do
-    :ok = Queue.push(queue, '123')
+    :ok = Queue.push(queue, ~c"123")
     expected_state = {0, queue, check_interval, nil}
 
-    assert {:noreply, '123', ^expected_state} = Producer.handle_demand(3, state)
+    assert {:noreply, ~c"123", ^expected_state} = Producer.handle_demand(3, state)
     assert Queue.pop(queue) == []
     refute_receive :dispatch_events
   end
 
   test "handle demand with backlog - basic", %{state: {_, queue, check_interval, _} = state} do
-    :ok = Queue.push(queue, '12')
+    :ok = Queue.push(queue, ~c"12")
 
-    assert {:noreply, '12', {1, ^queue, ^check_interval, timer}} =
+    assert {:noreply, ~c"12", {1, ^queue, ^check_interval, timer}} =
              Producer.handle_demand(3, state)
 
     assert is_reference(timer)
@@ -36,14 +36,14 @@ defmodule ProducerQueue.ProducerTest do
   end
 
   test "handle demand with backlog", %{state: {_, queue, check_interval, _}} do
-    :ok = Queue.push(queue, '12')
+    :ok = Queue.push(queue, ~c"12")
     {:ok, producer} = Producer.start_link(check_interval: 10, queue: queue)
     {:ok, consumer} = TestConsumer.start_link(producer)
 
     Process.sleep(check_interval)
     assert TestConsumer.get_events_count(consumer) == 2
 
-    :ok = Queue.push(queue, '3')
+    :ok = Queue.push(queue, ~c"3")
     Process.sleep(check_interval * 2)
 
     assert TestConsumer.get_events_count(consumer) == 3
