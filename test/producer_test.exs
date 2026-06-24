@@ -71,6 +71,24 @@ defmodule ProducerQueue.ProducerTest do
       assert Queue.pop(queue, 1) == []
     end
 
+    test "flushes a backlog that is not a multiple of the drain chunk size", %{queue: queue} do
+      state = %Producer{queue: queue, check_interval: 10, drain_on_shutdown: true}
+      backlog = Enum.to_list(1..2_501)
+      :ok = Queue.push(queue, backlog)
+
+      assert {:noreply, ^backlog, %Producer{demand: 0, timer: nil}} =
+               Producer.prepare_for_draining(state)
+
+      assert Queue.pop(queue, 1) == []
+    end
+
+    test "returns an empty list when enabled but the queue is already empty", %{queue: queue} do
+      state = %Producer{queue: queue, check_interval: 10, drain_on_shutdown: true}
+
+      assert {:noreply, [], %Producer{demand: 0, timer: nil}} =
+               Producer.prepare_for_draining(state)
+    end
+
     test "is a no-op when not enabled, leaving the queue intact", %{state: state, queue: queue} do
       :ok = Queue.push(queue, [1, 2, 3])
 
@@ -79,11 +97,11 @@ defmodule ProducerQueue.ProducerTest do
     end
 
     test "cancels a pending dispatch timer while draining", %{queue: queue} do
-      timer = Process.send_after(self(), :dispatch_events, 60_000)
+      timer = Process.send_after(self(), :dispatch_events, 20)
       state = %Producer{queue: queue, check_interval: 10, timer: timer, drain_on_shutdown: true}
 
       assert {:noreply, [], %Producer{timer: nil}} = Producer.prepare_for_draining(state)
-      assert Process.cancel_timer(timer) == false
+      refute_receive :dispatch_events, 50
     end
   end
 end

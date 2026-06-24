@@ -21,6 +21,7 @@ defmodule ProducerQueue.Producer do
   sits empty regardless of the cap - the cap is a limit, not an allocation.
   Draining consumers should override `:buffer_size` to comfortably exceed their
   worst-case queue depth at shutdown.
+  **N.B** if :buffer_size < queue depth at shutdown there is possible silent data loss so ensure you do not   undersize this.
   """
 
   use GenStage
@@ -44,7 +45,8 @@ defmodule ProducerQueue.Producer do
     * `:queue` - the queue to pull from (required)
     * `:check_interval` - ms between dispatch attempts when demand is unmet (default 500)
     * `:drain_on_shutdown` - flush the queue into the pipeline on graceful shutdown (default false)
-    * `:buffer_size` - GenStage producer buffer (default 100_000 when draining, else GenStage default)
+    * `:buffer_size` - GenStage producer buffer (default `:infinity` when
+      draining; otherwise unset, so GenStage's own default applies)
   """
   def start_link(opts \\ []), do: GenStage.start_link(__MODULE__, opts)
 
@@ -59,7 +61,7 @@ defmodule ProducerQueue.Producer do
       drain_on_shutdown: drain?
     }
 
-    {:producer, state, buffer_size: buffer_size(opts, drain?)}
+    producer(state, opts, drain?)
   end
 
   @impl true
@@ -120,6 +122,14 @@ defmodule ProducerQueue.Producer do
     end
   end
 
-  defp buffer_size(opts, true), do: Keyword.get(opts, :buffer_size, :infinity)
-  defp buffer_size(opts, false), do: Keyword.get(opts, :buffer_size, 10_000)
+  defp producer(state, opts, true) do
+    {:producer, state, buffer_size: Keyword.get(opts, :buffer_size, :infinity)}
+  end
+
+  defp producer(state, opts, false) do
+    case Keyword.fetch(opts, :buffer_size) do
+      {:ok, size} -> {:producer, state, buffer_size: size}
+      :error -> {:producer, state}
+    end
+  end
 end
