@@ -21,7 +21,8 @@ defmodule ProducerQueue.Producer do
   sits empty regardless of the cap - the cap is a limit, not an allocation.
   Draining consumers should override `:buffer_size` to comfortably exceed their
   worst-case queue depth at shutdown.
-  **N.B** if :buffer_size < queue depth at shutdown there is possible silent data loss so ensure you do not   undersize this.
+  **N.B.** if :buffer_size < queue depth at shutdown there is possible
+  silent data loss so ensure you do not undersize this.
   """
 
   use GenStage
