@@ -2,18 +2,21 @@
 
 ## Installation
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `producer_queue` to your list of dependencies in `mix.exs`:
+Published to the private `flickswitch` Hex repo. Add the repo once per machine
+(reads are open, no auth token needed):
+
+```sh
+curl -sS https://hex.flickswitch.cloud/repos/flickswitch/public_key -o /tmp/flickswitch_hex_public_key.pem
+mix hex.repo add flickswitch https://hex.flickswitch.cloud/repos/flickswitch --public-key /tmp/flickswitch_hex_public_key.pem
+```
+
+then in `mix.exs`:
 
 ```elixir
 def deps do
   [
-    {:producer_queue, "~> 5.0"}
+    {:producer_queue, "~> 5.0", repo: "flickswitch"}
   ]
 end
 ```
-
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at [https://hexdocs.pm/producer_queue](https://hexdocs.pm/producer_queue).
 
