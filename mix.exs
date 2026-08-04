@@ -8,7 +8,17 @@ defmodule ProducerQueue.MixProject do
       elixir: "~> 1.12",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      test_coverage: [tool: ExCoveralls]
+      test_coverage: [tool: ExCoveralls],
+      description: "Elixir library for basic prioritized queues with a producer for Broadway",
+      package: package()
+    ]
+  end
+
+  defp package do
+    [
+      licenses: ["MIT"],
+      links: %{"GitHub" => "https://github.com/Flickswitch/producer_queue"},
+      files: ~w(lib mix.exs README.md LICENSE)
     ]
   end
 
